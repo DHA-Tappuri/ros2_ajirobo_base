@@ -282,8 +282,14 @@ class DDSM115(object):
             pass
         self.ser.write(fb_req_cmd)
 
-        fb_rpm, fb_cur, error = self.read_reply(_id)
-        if(error != 0):
+        buffer = self._ser.read(10)
+        fb_cur = self._bytesarray_to_int16( buffer[2], buffer[3] )  # current
+        fb_rpm = self._bytesarray_to_int16( buffer[4], buffer[5] )  # velocity
+        fb_tmp = buffer[6] # temperature
+        fb_pos = buffer[7] # position
+        fb_err = buffer[8] # error
+
+        if(fb_err != 0):
             sensor_error       = error & 0b00000001
             over_current_error = error & 0b00000010
             phase_over_error   = error & 0b00000100
@@ -291,7 +297,14 @@ class DDSM115(object):
             troubleshoot_error = error & 0b00001000
             print_warning(f"error {error}")
             print_warning(f"sens_err: {sensor_error} phase_err: {phase_over_error} stall_err: {stall_error} trbs_err: {troubleshoot_error}")
-        return fb_rpm, fb_cur
+
+        self._status[_id].id       = _id
+        self._status[_id].current  = fb_cur
+        self._status[_id].velocity = fb_rpm
+        self._status[_id].position = fb_pos
+        self._status[_id].error    = fb_err
+            
+        return self._status[_id]
 
 
 
@@ -306,11 +319,15 @@ def main(args=None):
         while(1):
             for _ in range(10):
                 mot.send_velocity(1, -10)
-                mot.send_velocity(2, -20)
+                mot.send_velocity(2, -20)                
+                print( mot.get_motor_feedback(1) )
+                print( mot.get_motor_feedback(2) )
                 time.sleep(0.1)
             for _ in range(10):
                 mot.send_velocity(1, 10)
                 mot.send_velocity(2, 20)
+                print( mot.get_motor_feedback(1) )
+                print( mot.get_motor_feedback(2) )                
                 time.sleep(0.1)
             
             
