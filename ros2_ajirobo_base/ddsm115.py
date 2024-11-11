@@ -52,7 +52,7 @@ class DDSM115_STATUS:
 class DDSM115(object):
     # constructor
     def __init__(self, device="/dev/ttyUSB0", ids=[], callback=None):
-        self._ser            = serial.Serial(device, 115200, timeout=0.01)
+        self._ser            = serial.Serial(device, 115200, timeout=1)
         #self._ser.rs485_mode = serial.rs485.RS485Settings()
         self._crc8        = crcmod.predefined.mkPredefinedCrcFun('crc-8-maxim')
         self._str_10bytes = ">BBBBBBBBBB"
@@ -204,7 +204,7 @@ class DDSM115(object):
 
     # set degree
     def send_current(self, _id: int, current):
-        cur_ints  = self._int16_to_bytesarray(self.map(current,-8.0,8.0,-32767,32767))
+        cur_ints  = self._int16_to_bytesarray(self._map(current,-8.0,8.0,-32767,32767))
         # make packet
         cmd_bytes = struct.pack( self._str_9bytes, _id, 0x64, cur_ints[0], cur_ints[1], 0x00, 0x00, 0x00, 0x00, 0x00 )
         cmd_bytes = self._crc_attach(cmd_bytes)
@@ -276,11 +276,11 @@ class DDSM115(object):
     # get feedback
     def get_motor_feedback(self, _id: int):
         fb_req_cmd = struct.pack(self._str_9bytes, _id, 0x74, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00)
-        fb_req_cmd = self.crc_attach(fb_req_cmd)
+        fb_req_cmd = self._crc_attach(fb_req_cmd)
         while( not self._ser.writable() ):
             print_warning("get_motor_feedback not writable")
             pass
-        self.ser.write(fb_req_cmd)
+        self._ser.write(fb_req_cmd)
 
         buffer = self._ser.read(10)
         fb_cur = self._bytesarray_to_int16( buffer[2], buffer[3] )  # current
@@ -290,12 +290,12 @@ class DDSM115(object):
         fb_err = buffer[8] # error
 
         if(fb_err != 0):
-            sensor_error       = error & 0b00000001
-            over_current_error = error & 0b00000010
-            phase_over_error   = error & 0b00000100
-            stall_error        = error & 0b00001000
-            troubleshoot_error = error & 0b00001000
-            print_warning(f"error {error}")
+            sensor_error       = fb_err & 0b00000001
+            over_current_error = fb_err & 0b00000010
+            phase_over_error   = fb_err & 0b00000100
+            stall_error        = fb_err & 0b00001000
+            troubleshoot_error = fb_err & 0b00001000
+            print_warning(f"error {fb_err}")
             print_warning(f"sens_err: {sensor_error} phase_err: {phase_over_error} stall_err: {stall_error} trbs_err: {troubleshoot_error}")
 
         self._status[_id].id       = _id
